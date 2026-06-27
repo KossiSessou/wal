@@ -1,4 +1,4 @@
-# DisSys
+# raftkv
 
 A sharded, Raft-replicated, linearizable key-value database, built from scratch in Go.
 
