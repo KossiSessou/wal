@@ -1,7 +1,6 @@
 package main
 
 import (
-	"hash/fnv"
 	"sync"
 )
 
@@ -57,10 +56,19 @@ func NewMutexStore() *MutexStore {
 	return &MutexStore{data: make(map[string]string)}
 }
 
+func hash(s string) uint32 {
+	var h uint32 = 2166136261
+	for i := 0; i < len(s); i++ {
+		h ^= uint32(s[i])
+		h *= 16777619
+	}
+	return h
+}
+
 func (s *ShardedStore) getShard(key string) *shard {
-	h := fnv.New32a()
-	h.Write([]byte(key))
-	return s.shards[h.Sum32()%uint32(len(s.shards))]
+	h := hash(key)
+
+	return s.shards[h&(uint32(len(s.shards))-1)]
 }
 
 func NewShardedStore() *ShardedStore {
