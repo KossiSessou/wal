@@ -11,7 +11,7 @@ This format describes a WAL record so that readers with no external background c
 | Offset | Field        | Width    | Type            | Description                  |
 |--------|--------------|----------|-----------------|------------------------------|
 | 0      | Length       | 4 bytes  | uint32 LE       | Length of the payload        |
-| 4      | Checksum     | 4 bytes   | uint32 LE       | Checksum of Length + Payload |
+| 4      | Checksum     | 4 bytes  | uint32 LE       | Checksum of Length + Payload |
 | 8      | Payload      | N bytes  | variable        | Payload                      |
 
 Header = 8 bytes fixed. Total = 8 + N.
