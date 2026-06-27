@@ -47,12 +47,19 @@ func TestAppendBasic(t *testing.T) {
 func TestAppendSyncInterval(t *testing.T) {
 	dir := t.TempDir()
 	path := dir + "test.go"
-	w, _ := Open(path, Config{Mode: SyncInterval, Interval: 50 * time.Millisecond})
-	go func() {
-		for i := 0; i < 1000; i++ {
-			w.Append([]byte("hello"))
+	w, err := Open(path, Config{Mode: SyncInterval, Interval: 50 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 1000 {
+		_, err := w.Append([]byte("hello"))
+		if err != nil {
+			t.Fatal(err)
 		}
-	}()
+	}
 	time.Sleep(500 * time.Millisecond)
-	w.Close()
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
