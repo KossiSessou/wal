@@ -1,7 +1,8 @@
 .PHONY: test lint bench
 
 test:
-	go test ./...
+
+	go test -race ./...
 
 lint:
 	go vet ./...
