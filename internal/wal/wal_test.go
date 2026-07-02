@@ -2,6 +2,7 @@ package wal
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -9,9 +10,7 @@ import (
 func TestAppendBasic(t *testing.T) {
 	dir := t.TempDir()
 
-	path := dir + "test.wal"
-
-	w, err := Open(path, Config{Mode: SyncNever})
+	w, err := Open(dir, Config{Mode: SyncNever})
 
 	if err != nil {
 		t.Fatal(err)
@@ -29,15 +28,15 @@ func TestAppendBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if off1 != 0 {
+	if off1.Position != 0 {
 		t.Errorf("First offset = %d; want 0", off1)
 	}
 
-	if off2 != 13 {
+	if off2.Position != 13 {
 		t.Errorf("Second offset = %d; want 13", off2)
 	}
 
-	info, _ := os.Stat(path)
+	info, _ := w.fd.Stat()
 
 	if info.Size() != 26 {
 		t.Errorf("File size = %d; want 26", info.Size())
@@ -46,8 +45,8 @@ func TestAppendBasic(t *testing.T) {
 
 func TestAppendSyncInterval(t *testing.T) {
 	dir := t.TempDir()
-	path := dir + "test.go"
-	w, err := Open(path, Config{Mode: SyncInterval, Interval: 50 * time.Millisecond})
+
+	w, err := Open(dir, Config{Mode: SyncInterval, Interval: 50 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,4 +61,51 @@ func TestAppendSyncInterval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestOpenResumesActiveSegment(t *testing.T) {
+	dir := t.TempDir()
+	// simulate a WAL that previously rotated through 3 segments
+	for _, id := range []uint64{1, 2, 3} {
+		f, err := os.Create(filepath.Join(dir, formatSegmentName(id)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = f.Close()
+	}
+
+	w, err := Open(dir, Config{Mode: SyncNever})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if w.activeID != 3 {
+		t.Errorf("activeID = %d; want 3 (highest existing segment)", w.activeID)
+	}
+
+	_ = w.Close()
+}
+
+func TestRotation(t *testing.T) {
+	dir := t.TempDir()
+	w, _ := Open(dir, Config{Mode: SyncNever, MaxSize: 40})
+
+	// each record: 8 header + 10 payload = 18 bytes. Two fit in 40; third forces rotation.
+	o1, _ := w.Append(make([]byte, 10)) // seg 1, pos 0
+	o2, _ := w.Append(make([]byte, 10)) // seg 1, pos 18
+	o3, _ := w.Append(make([]byte, 10)) // 18+18+18=54 > 40 → rotate → seg 2, pos 0
+
+	if o1.SegmentID != 1 || o2.SegmentID != 1 {
+		t.Errorf("first two records should be in segment 1")
+	}
+	if o3.SegmentID != 2 || o3.Position != 0 {
+		t.Errorf("third record should start segment 2 at position 0, got seg=%d pos=%d", o3.SegmentID, o3.Position)
+	}
+
+	ids, _ := listSegments(dir)
+	if len(ids) != 2 {
+		t.Errorf("expected 2 segment files, got %d", len(ids))
+	}
+
+	_ = w.Close()
 }

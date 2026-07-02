@@ -18,7 +18,7 @@ func TestRaceCon(t *testing.T) {
 
 	wg.Add(10)
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		go func() {
 			defer wg.Done()
 
